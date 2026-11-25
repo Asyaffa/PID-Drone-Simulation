@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulasi Kendali PID Drone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1015;--panel:#151a22;--panel2:#1b2130;--line:#283043;--txt:#e5e9f0;--mut:#8a93a6;--acc:#4cc2ff;--sp:#ffb547;--ok:#4ade80;--bad:#f87171;--p:#60a5fa;--i:#c084fc;--d:#34d399;--m1:#f472b6;--m2:#a3e635}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 'IBM Plex Sans',system-ui,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.2px}
+.sub{color:var(--mut);font-size:12.5px}
+.toolbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--acc)}
+button.on{background:var(--acc);color:#00131d;border-color:var(--acc);font-weight:500}
+button.warn:hover{border-color:var(--sp)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#simWrap{position:relative;overflow:hidden}
+#sim{width:100%;aspect-ratio:16/9;display:block;cursor:crosshair;touch-action:none}
+.hud{position:absolute;top:10px;left:12px;font:12px/1.65 'IBM Plex Mono',monospace;color:var(--mut);pointer-events:none;background:rgba(13,16,21,.72);padding:6px 9px;border-radius:6px;border:1px solid var(--line)}
+.hud b{color:var(--txt);font-weight:500}
+.status{position:absolute;top:10px;right:12px;font:12px 'IBM Plex Mono',monospace;padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:rgba(13,16,21,.72)}
+.hint{position:absolute;bottom:8px;right:12px;font-size:11.5px;color:var(--mut);pointer-events:none}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.metrics .card{padding:10px 12px}
+.metrics h3,.plot h3{margin:0 0 6px;font-size:12.5px;font-weight:500;color:var(--mut);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mrow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mrow div{background:var(--panel2);border-radius:6px;padding:6px 8px}
+.mrow small{display:block;color:var(--mut);font-size:11px}
+.mrow span{font:500 15px 'IBM Plex Mono',monospace}
+.plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+@media(max-width:700px){.plots,.metrics{grid-template-columns:1fr}.mrow{grid-template-columns:repeat(2,1fr)}}
+.plot{padding:8px 10px}
+.plot canvas{width:100%;height:140px;display:block}
+.lg{display:inline-flex;align-items:center;gap:5px;font-weight:400;font-size:11.5px}
+.lg i{width:14px;height:0;border-top:2px solid;display:inline-block}
+.lg i.dash{border-top-style:dashed}
+aside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tabs{display:flex;gap:4px;padding:6px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:transparent;border-color:transparent}
+.tabs button.on{background:var(--panel2);color:var(--txt);border-color:var(--line)}
+.tab{padding:12px;display:none}
+.tab.on{display:block}
+.loop{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--panel2)}
+.lh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.lh label{font-weight:600;display:flex;gap:6px;align-items:center;cursor:pointer}
+.mut{color:var(--mut);font-size:12px}
+.row{display:grid;grid-template-columns:62px 1fr 66px;gap:8px;align-items:center;margin:5px 0}
+.row label{font-size:12.5px;color:var(--mut)}
+.row label b{color:var(--txt);font-family:'IBM Plex Mono',monospace;font-weight:500}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=number]{width:100%;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:5px;padding:3px 5px;font:12.5px 'IBM Plex Mono',monospace}
+.bars{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
+.bar{font:11px 'IBM Plex Mono',monospace;color:var(--mut)}
+.bar .tr{height:6px;background:var(--bg);border-radius:3px;position:relative;margin-top:3px;overflow:hidden}
+.bar .tr::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.bar .fl{position:absolute;top:0;bottom:0;border-radius:3px}
+.chk{display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-size:13px;cursor:pointer}
+.chk input{margin-top:3px}
+.chk small{display:block;color:var(--mut);font-size:11.5px}
+.presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.presets button{font-size:12px;padding:4px 8px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sec{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:14px 0 6px}
+.sec:first-child{margin-top:0}
+.theory{font-size:13px}
+.theory p{margin:6px 0}
+.eq{font:13px 'IBM Plex Mono',monospace;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;white-space:nowrap}
+.theory ol,.theory ul{padding-left:18px;margin:6px 0}
+.theory li{margin:3px 0}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--acc);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none}
+kbd{font:11px 'IBM Plex Mono',monospace;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--bg)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Simulasi Kendali PID Drone</h1>
+    <div class="sub">Quadrotor bidang 2D · kendali kaskade (ketinggian, posisi, sudut) · real-time</div>
+  </div>
+  <div class="toolbar">
+    <div class="seg" id="modeSeg">
+      <button data-mode="manual" class="on">Manual</button>
+      <button data-mode="square">Waypoint kotak</button>
+      <button data-mode="circle">Lintasan lingkaran</button>
+    </div>
+    <button id="stepZ">Step ketinggian</button>
+    <button id="stepX">Step posisi</button>
+    <div class="seg" id="speedSeg">
+      <button data-s="0.25">¼×</button><button data-s="0.5">½×</button><button data-s="1" class="on">1×</button><button data-s="2">2×</button>
+    </div>
+    <button id="pauseBtn">Jeda</button>
+    <button id="resetBtn" class="warn">Reset</button>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="card" id="simWrap">
+      <canvas id="sim"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="status" id="status"></div>
+      <div class="hint">Klik/seret untuk memindah setpoint · <kbd>←↑→↓</kbd> geser · <kbd>Spasi</kbd> jeda · <kbd>R</kbd> reset</div>
+    </div>
+
+    <div class="metrics">
+      <div class="card">
+        <h3>Respons step — ketinggian y</h3>
+        <div class="mrow">
+          <div><small>Rise time</small><span id="mzR">—</span></div>
+          <div><small>Overshoot</small><span id="mzO">—</span></div>
+          <div><small>Settling (2%)</small><span id="mzS">—</span></div>
+          <div><small>Error tunak</small><span id="mzE">—</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Respons step — posisi x</h3>
+        <div class="mrow">
+          <div><small>Rise time</small><span id="mxR">—</span></div>
+          <div><small>Overshoot</small><span id="mxO">—</span></div>
+          <div><small>Settling (2%)</small><span id="mxS">—</span></div>
+          <div><small>Error tunak</small><span id="mxE">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plots">
+      <div class="card plot"><h3>Ketinggian y (m) <span class="lg"><i style="color:var(--acc)"></i>y</span><span class="lg"><i class="dash" style="color:var(--sp)"></i>setpoint</span></h3><canvas id="pY"></canvas></div>
+      <div class="card plot"><h3>Posisi horizontal x (m) <span class="lg"><i style="color:var(--acc)"></i>x</span><span class="lg"><i class="dash" style="color:var(--sp)"></i>setpoint</span></h3><canvas id="pX"></canvas></div>
+      <div class="card plot"><h3>Sudut roll θ (°) <span class="lg"><i style="color:var(--acc)"></i>θ</span><span class="lg"><i class="dash" style="color:var(--sp)"></i>θ referensi</span></h3><canvas id="pT"></canvas></div>
+      <div class="card plot"><h3>Gaya dorong motor (N) <span class="lg"><i style="color:var(--m1)"></i>F₁ kiri</span><span class="lg"><i style="color:var(--m2)"></i>F₂ kanan</span><span class="lg"><i class="dash" style="color:var(--mut)"></i>hover</span></h3><canvas id="pF"></canvas></div>
+    </div>
+  </section>
+
+  <aside class="card" style="padding:0">
+    <div class="tabs" id="tabs">
+      <button data-t="tPid" class="on">PID</button>
+      <button data-t="tDist">Gangguan</button>
+      <button data-t="tSys">Sistem</button>
+      <button data-t="tTeori">Teori</button>
+    </div>
+
+    <div class="tab on" id="tPid">
+      <div class="sec">Preset loop luar (ketinggian &amp; posisi)</div>
+      <div class="presets" id="presets"></div>
+      <div id="loops"></div>
+      <button id="copyCsv" style="width:100%">Salin data 10 detik terakhir (CSV)</button>
+    </div>
+
+    <div class="tab" id="tDist">
+      <div class="sec">Parameter fisik</div>
+      <div id="distSliders"></div>
+      <div class="sec">Gangguan sesaat</div>
+      <div class="btns">
+        <button id="gustL">⇠ Hembusan angin</button>
+        <button id="gustR">Hembusan angin ⇢</button>
+        <button id="kick">Tendangan rotasi</button>
+        <button id="clearDist">Hapus semua gangguan</button>
+      </div>
+      <p class="mut">Pengendali selalu memakai massa nominal 1,0 kg untuk kompensasi gravitasi. Ubah massa beban untuk melihat mengapa aksi integral (Ki) dibutuhkan.</p>
+    </div>
+
+    <div class="tab" id="tSys">
+      <div class="sec">Implementasi digital</div>
+      <div id="sysSliders"></div>
+      <label class="chk"><input type="checkbox" id="optFF" checked><span>Kompensasi gravitasi (feedforward)<small>T = m(g + u<sub>z</sub>)/cos θ. Matikan → integral harus menanggung seluruh berat drone.</small></span></label>
+      <label class="chk"><input type="checkbox" id="optDM" checked><span>Turunan pada pengukuran<small>Menghindari <i>derivative kick</i> saat setpoint melompat.</small></span></label>
+      <label class="chk"><input type="checkbox" id="optAW" checked><span>Anti-windup (integrasi bersyarat)<small>Integrator berhenti saat keluaran tersaturasi.</small></span></label>
+    </div>
+
+    <div class="tab theory" id="tTeori">
+      <div class="sec">Hukum kendali PID</div>
+      <div class="eq">u(t) = Kp·e(t) + Ki·∫e(τ)dτ + Kd·de(t)/dt</div>
+      <p>Dalam bentuk diskrit (periode sampling T<sub>s</sub>):</p>
+      <div class="eq">u[k] = Kp·e[k] + Ki·T<sub>s</sub>·Σe[i] + Kd·(e[k]−e[k−1])/T<sub>s</sub></div>
+      <div class="sec">Struktur kaskade</div>
+      <svg viewBox="0 0 340 150" width="100%" style="display:block;margin:4px 0" font-family="IBM Plex Sans" font-size="10.5">
+        <defs><marker id="ar" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#8a93a6"/></marker></defs>
+        <g fill="none" stroke="#8a93a6" stroke-width="1.2" marker-end="url(#ar)">
+          <path d="M22 30 H48"/><path d="M110 30 H138"/><path d="M200 30 H228"/><path d="M22 105 H48"/><path d="M110 105 H228"/><path d="M290 67 H318"/>
+        </g>
+        <g fill="#1b2130" stroke="#4cc2ff" stroke-width="1.2">
+          <rect x="50" y="16" width="58" height="28" rx="5"/><rect x="140" y="16" width="58" height="28" rx="5"/><rect x="50" y="91" width="58" height="28" rx="5"/><rect x="230" y="16" width="58" height="103" rx="5"/>
+        </g>
+        <g fill="#e5e9f0" text-anchor="middle">
+          <text x="79" y="34">PID x</text><text x="169" y="34">PID θ</text><text x="79" y="109">PID z</text><text x="259" y="64">Mixer</text><text x="259" y="78" fill="#8a93a6">F₁, F₂</text>
+        </g>
+        <g fill="#ffb547"><text x="2" y="26">x<tspan font-size="8">sp</tspan></text><text x="2" y="101">y<tspan font-size="8">sp</tspan></text></g>
+        <g fill="#8a93a6"><text x="114" y="25">θ<tspan font-size="8">ref</tspan></text><text x="206" y="25">τ</text><text x="160" y="100">T (dorong total)</text><text x="300" y="60">drone</text></g>
+      </svg>
+      <p>Loop luar (posisi x) menghasilkan percepatan yang diinginkan, dikonversi menjadi sudut referensi θ<sub>ref</sub> = −atan(a<sub>x</sub>/g). Loop dalam (sudut) harus jauh lebih cepat dari loop luar.</p>
+      <div class="sec">Model drone (bidang vertikal)</div>
+      <div class="eq">m·ẍ = −(F₁+F₂)·sin θ + F<sub>angin</sub> − c·ẋ</div>
+      <div class="eq">m·ÿ = (F₁+F₂)·cos θ − m·g − c·ẏ</div>
+      <div class="eq">I·θ̈ = (F₂ − F₁)·L</div>
+      <p class="mut">m = 1 kg (nominal), L = 0,25 m, I = 0,02 kg·m², F<sub>maks</sub> = 12 N per motor, motor orde-1 (τ<sub>m</sub> = 30 ms). Fisika diintegrasi pada 1 kHz.</p>
+      <div class="sec">Saran percobaan</div>
+      <ol>
+        <li>Pilih preset <b>Hanya P</b>, lakukan step ketinggian. Amati osilasi. Naikkan Kd perlahan dan catat overshoot.</li>
+        <li>Naikkan massa beban ke 1,5 kg dengan Ki = 0. Ukur error tunak, lalu naikkan Ki.</li>
+        <li>Matikan anti-windup, tahan drone di tanah (setpoint y = 0 lalu naikkan) dan bandingkan overshoot.</li>
+        <li>Naikkan noise sudut ke 2° dan Kd sudut. Bandingkan gaya motor dengan filter D 5 Hz vs tanpa filter.</li>
+        <li>Turunkan frekuensi kendali ke 30 Hz. Kapan loop sudut menjadi tidak stabil?</li>
+        <li>Turunkan Kp sudut hingga loop dalam lebih lambat dari loop posisi. Apa yang terjadi?</li>
+      </ol>
+    </div>
+  </aside>
+</main>
+<div id="toast"></div>
+
+<script>
+(()=>{
+"use strict";
+// ---------- Konstanta ----------
+const g=9.81, L=0.25, Fmax=12, mNom=1.0, Inom=0.02, DEG=Math.PI/180;
+const WIN=10; // jendela plot (s)
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// ---------- Opsi ----------
+const opt={mass:1.0,wind:0,turb:0,noisePos:0,noiseAng:0,fc:250,dCut:20,maxTilt:30,tau:0.03,ff:true,dOnMeas:true,antiWindup:true};
+
+// ---------- PID ----------
+class PID{
+  constructor(kp,ki,kd,min,max){this.kp=kp;this.ki=ki;this.kd=kd;this.min=min;this.max=max;this.on=true;this.reset();}
+  reset(){this.I=0;this.dF=0;this.prevE=0;this.prevPv=0;this.first=true;this.p=0;this.d=0;this.u=0;}
+  update(sp,pv,dt){
+    const e=sp-pv;
+    const P=this.kp*e;
+    let dRaw=0;
+    if(!this.first) dRaw = opt.dOnMeas ? -(pv-this.prevPv)/dt : (e-this.prevE)/dt;
+    this.first=false;
+    const a = opt.dCut>=200 ? 1 : dt/(dt+1/(2*Math.PI*opt.dCut));
+    this.dF += a*(dRaw-this.dF);
+    const D=this.kd*this.dF;
+    let iNew=this.I+this.ki*e*dt;
+    if(opt.antiWindup){
+      const uTry=P+iNew+D;
+      if((uTry>this.max&&e>0)||(uTry<this.min&&e<0)) iNew=this.I;
+      iNew=clamp(iNew,this.min,this.max);
+    }
+    this.I=iNew;
+    this.p=P;this.d=D;
+    this.u=P+this.I+D;
+    this.prevE=e;this.prevPv=pv;
+    return clamp(this.u,this.min,this.max);
+  }
+}
+const pid={
+  z:new PID(6,1.5,4.5,-8,15),
+  x:new PID(1.2,0.05,1.6,-6,6),
+  th:new PID(120,0,18,-250,250)
+};
+const LOOPDEF={
+  z:{name:'Ketinggian (y)',unit:'u → percepatan vertikal [m/s²]',r:{kp:[0,20,0.1],ki:[0,10,0.05],kd:[0,10,0.05]}},
+  x:{name:'Posisi horizontal (x)',unit:'u → percepatan horizontal [m/s²]',r:{kp:[0,5,0.05],ki:[0,2,0.01],kd:[0,5,0.05]}},
+  th:{name:'Sudut roll (θ) — loop dalam',unit:'u → percepatan sudut [rad/s²]',r:{kp:[0,400,1],ki:[0,100,0.5],kd:[0,40,0.5]}}
+};
+const PRESETS={
+  'Seimbang':{z:[6,1.5,4.5],x:[1.2,0.05,1.6]},
+  'Hanya P':{z:[4,0,0],x:[1.2,0,0]},
+  'PD':{z:[4,0,3],x:[1.2,0,1.6]},
+  'PI':{z:[4,1.5,0],x:[1.2,0.1,0]},
+  'Agresif':{z:[15,4,4],x:[3,0.2,2]},
+  'Lambat':{z:[1.5,0.3,3],x:[0.5,0.02,1.4]}
+};
+
+// ---------- State ----------
+const S={}; const sp={x:0,y:3};
+let mode='manual', speed=1, paused=false;
+const buf=[]; const trail=[];
+
+class StepMeter{
+  constructor(){this.on=false;this.essF=0;}
+  start(t,from,to){this.on=Math.abs(to-from)>0.05;this.t0=t;this.from=from;this.to=to;this.t10=null;this.t90=null;this.peak=from;this.lastOut=t;}
+  disable(){this.on=false;}
+  update(t,v,target,h){
+    this.essF += (target-v-this.essF)*Math.min(1,h/0.5);
+    if(!this.on)return;
+    const s=Math.sign(this.to-this.from),A=Math.abs(this.to-this.from);
+    const prog=(v-this.from)*s/A;
+    if(this.t10===null&&prog>=0.1)this.t10=t;
+    if(this.t90===null&&prog>=0.9)this.t90=t;
+    if((v-this.peak)*s>0)this.peak=v;
+    const band=Math.max(0.02*A,0.02);
+    if(Math.abs(v-this.to)>band)this.lastOut=t;
+  }
+  get rise(){return this.on&&this.t10!==null&&this.t90!==null?this.t90-this.t10:null;}
+  get overshoot(){return this.on?Math.max(0,(this.peak-this.to)*Math.sign(this.to-this.from))/Math.abs(this.to-this.from)*100:null;}
+  settle(t){return this.on&&t-this.lastOut>1.5?this.lastOut-this.t0:null;}
+}
+const meter={z:new StepMeter(),x:new StepMeter()};
+
+function resetAll(){
+  Object.assign(S,{t:0,x:0,y:0,vx:0,vy:0,th:0,om:0,F1:0,F2:0,F1c:0,F2c:0,thd:0,Tc:0,sat:false,ground:true,turb:0,gust:0,gustT:0,fw:0,acc:0,ctrlAcc:1,sampleAcc:0,trailAcc:0,wpT:0,wpI:0,circT:0,prop:0});
+  for(const k in pid)pid[k].reset();
+  buf.length=0;trail.length=0;
+  sp.x=0;sp.y=3;
+  meter.z.start(0,0,3);meter.x.disable();
+  meter.z.essF=0;meter.x.essF=0;
+  setMode('manual');
+}
+
+function setSP(x,y){
+  x=clamp(x,-5.5,5.5);y=clamp(y,0,6);
+  const dx=Math.abs(x-sp.x)>0.01, dy=Math.abs(y-sp.y)>0.01;
+  sp.x=x;sp.y=y;
+  if(mode!=='circle'){
+    if(dy)meter.z.start(S.t,S.y,y);
+    if(dx)meter.x.start(S.t,S.x,x);
+  }
+}
+const WP=[[-3,2],[3,2],[3,5],[-3,5]];
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  if(m==='square'){S.wpI=0;S.wpT=0;setSP(...WP[0]);}
+  if(m==='circle'){S.circT=0;meter.z.disable();meter.x.disable();}
+}
+
+// ---------- Kendali ----------
+function control(dt){
+  const ym=S.y+opt.noisePos*randn(), xm=S.x+opt.noisePos*randn(), thm=S.th+opt.noiseAng*DEG*randn();
+  const maxT=opt.maxTilt*DEG;
+  let thd=0;
+  if(pid.x.on){const ax=pid.x.update(sp.x,xm,dt);thd=clamp(-Math.atan2(ax,g),-maxT,maxT);}
+  const c=Math.max(Math.cos(thm),0.5);
+  let Tc;
+  if(pid.z.on){const az=pid.z.update(sp.y,ym,dt);Tc=opt.ff?mNom*(g+az)/c:mNom*az/c;}
+  else Tc=opt.ff?mNom*g/c:0;
+  Tc=clamp(Tc,0,2*Fmax);
+  let tau=0;
+  if(pid.th.on){const al=pid.th.update(thd,thm,dt);tau=Inom*al;}
+  const f1=Tc/2-tau/(2*L), f2=Tc/2+tau/(2*L);
+  S.F1c=clamp(f1,0,Fmax);S.F2c=clamp(f2,0,Fmax);
+  S.sat=(f1<0||f1>Fmax||f2<0||f2>Fmax);
+  S.thd=thd;S.Tc=Tc;
+}
+
+// ---------- Fisika (1 kHz) ----------
+function step(h){
+  S.t+=h;
+  if(mode==='square'){S.wpT+=h;if(S.wpT>=5){S.wpT=0;S.wpI=(S.wpI+1)%WP.length;setSP(...WP[S.wpI]);}}
+  else if(mode==='circle'){S.circT+=h;const w=0.45;sp.x=2.6*Math.cos(w*S.circT);sp.y=3.3+1.8*Math.sin(w*S.circT);}
+
+  S.ctrlAcc+=h;
+  if(S.ctrlAcc>=1/opt.fc-1e-9){control(S.ctrlAcc);S.ctrlAcc=0;}
+
+  const m=opt.mass;
+  S.F1+=(S.F1c-S.F1)*h/opt.tau;S.F2+=(S.F2c-S.F2)*h/opt.tau;
+  const T=S.F1+S.F2;
+  S.turb+=-S.turb*h/0.6+opt.turb*Math.sqrt(2*h/0.6)*randn();
+  if(S.gustT>0){S.gustT-=h;if(S.gustT<=0)S.gust=0;}
+  const Fw=opt.wind+S.turb+S.gust; S.fw=Fw;
+  const ax=(-T*Math.sin(S.th)+Fw-0.3*S.vx)/m;
+  const ay=(T*Math.cos(S.th)-0.3*S.vy)/m-g;
+  const al=((S.F2-S.F1)*L-0.004*S.om)/Inom;
+  S.vx+=ax*h;S.vy+=ay*h;S.om+=al*h;
+  S.x+=S.vx*h;S.y+=S.vy*h;S.th+=S.om*h;
+  if(S.th>Math.PI)S.th-=2*Math.PI;else if(S.th<-Math.PI)S.th+=2*Math.PI;
+  if(S.y<=0){
+    S.y=0;if(S.vy<0)S.vy=0;
+    S.vx*=Math.pow(0.02,h);
+    if(T*Math.cos(S.th)<m*g){S.om*=0.95;S.th*=0.99;}
+    S.ground=true;
+  } else S.ground=false;
+  if(S.x<-6.5){S.x=-6.5;S.vx=Math.max(0,S.vx);}
+  if(S.x>6.5){S.x=6.5;S.vx=Math.min(0,S.vx);}
+  if(S.y>9){S.y=9;S.vy=Math.min(0,S.vy);}
+  S.prop+=h*(T+4)*6;
+
+  meter.z.update(S.t,S.y,sp.y,h);meter.x.update(S.t,S.x,sp.x,h);
+
+  S.sampleAcc+=h;
+  if(S.sampleAcc>=1/60){S.sampleAcc=0;
+    buf.push({t:S.t,y:S.y,ysp:sp.y,x:S.x,xsp:sp.x,th:S.th/DEG,thd:S.thd/DEG,F1:S.F1,F2:S.F2,hov:opt.mass*g/2});
+    while(buf.length&&buf[0].t<S.t-WIN)buf.shift();
+  }
+  S.trailAcc+=h;
+  if(S.trailAcc>=1/30){S.trailAcc=0;trail.push([S.x,S.y]);if(trail.length>120)trail.shift();}
+}
+
+// ---------- Kanvas simulasi ----------
+const cv=document.getElementById('sim'),ctx=cv.getContext('2d');
+const XMIN=-6,XMAX=6,YMIN=-0.6;
+let W=0,H=0,scale=1,YMAX=6;
+function fit(c){const dpr=window.devicePixelRatio||1;const w=c.clientWidth,h=c.clientHeight;if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);}const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return [w,h];}
+const wx=x=>(x-XMIN)*scale, wy=y=>H-(y-YMIN)*scale;
+const particles=Array.from({length:50},()=>({x:Math.random(),y:Math.random(),l:0.5+Math.random()}));
+
+function drawSim(realDt){
+  [W,H]=fit(cv);scale=W/(XMAX-XMIN);YMAX=YMIN+H/scale;
+  const grd=ctx.createLinearGradient(0,0,0,H);grd.addColorStop(0,'#0f1724');grd.addColorStop(1,'#141b26');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='rgba(138,147,166,0.10)';ctx.lineWidth=1;ctx.font='10.5px IBM Plex Mono, monospace';ctx.fillStyle='rgba(138,147,166,0.7)';
+  for(let x=Math.ceil(XMIN);x<=XMAX;x++){ctx.beginPath();ctx.moveTo(wx(x)+.5,0);ctx.lineTo(wx(x)+.5,wy(0));ctx.stroke();if(x>XMIN)ctx.fillText(x+'',wx(x)+3,wy(0)+13);}
+  for(let y=1;y<=YMAX;y++){ctx.beginPath();ctx.moveTo(0,wy(y)+.5);ctx.lineTo(W,wy(y)+.5);ctx.stroke();ctx.fillText(y+' m',4,wy(y)-3);}
+  // ground
+  ctx.fillStyle='#1a2119';ctx.fillRect(0,wy(0),W,H-wy(0));
+  ctx.strokeStyle='#3b4a35';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,wy(0));ctx.lineTo(W,wy(0));ctx.stroke();
+  // wind particles
+  const wt=S.fw||0;
+  if(Math.abs(wt)>0.15){
+    ctx.strokeStyle=`rgba(180,210,255,${Math.min(0.45,Math.abs(wt)*0.08)})`;ctx.lineWidth=1.2;
+    for(const p of particles){
+      p.x+=wt*0.035*realDt*p.l;if(p.x>1)p.x-=1;if(p.x<0)p.x+=1;
+      const px=p.x*W,py=p.y*wy(0.1),len=clamp(Math.abs(wt)*6*p.l,6,60)*Math.sign(wt);
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px-len,py);ctx.stroke();
+    }
+  }
+  // path preview
+  if(mode==='square'){ctx.setLineDash([3,5]);ctx.strokeStyle='rgba(255,181,71,0.35)';ctx.beginPath();WP.forEach((p,i)=>i?ctx.lineTo(wx(p[0]),wy(p[1])):ctx.moveTo(wx(p[0]),wy(p[1])));ctx.closePath();ctx.stroke();ctx.setLineDash([]);}
+  if(mode==='circle'){ctx.setLineDash([3,5]);ctx.strokeStyle='rgba(255,181,71,0.35)';ctx.beginPath();ctx.ellipse(wx(0),wy(3.3),2.6*scale,1.8*scale,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+  // setpoint
+  const sx=wx(sp.x),sy=wy(sp.y);
+  ctx.strokeStyle='rgba(255,181,71,0.25)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,wy(0));ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='#ffb547';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx,sy,9,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx-14,sy);ctx.lineTo(sx-5,sy);ctx.moveTo(sx+5,sy);ctx.lineTo(sx+14,sy);ctx.moveTo(sx,sy-14);ctx.lineTo(sx,sy-5);ctx.moveTo(sx,sy+5);ctx.lineTo(sx,sy+14);ctx.stroke();
+  ctx.fillStyle='#ffb547';ctx.font='11px IBM Plex Mono, monospace';ctx.fillText(`(${sp.x.toFixed(2)}, ${sp.y.toFixed(2)})`,sx+12,sy-12);
+  // trail
+  for(let i=1;i<trail.length;i++){ctx.strokeStyle=`rgba(76,194,255,${i/trail.length*0.5})`;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(wx(trail[i-1][0]),wy(trail[i-1][1]));ctx.lineTo(wx(trail[i][0]),wy(trail[i][1]));ctx.stroke();}
+  // drone
+  const k=scale*1.7, arm=L*k;
+  ctx.save();ctx.translate(wx(S.x),wy(S.y)-0.06*k);ctx.rotate(-S.th);
+  // legs
+  ctx.strokeStyle='#6b7488';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-arm*0.45,0);ctx.lineTo(-arm*0.6,0.06*k);ctx.moveTo(arm*0.45,0);ctx.lineTo(arm*0.6,0.06*k);ctx.stroke();
+  // arm
+  ctx.strokeStyle='#9aa4b8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-arm,-0.02*k);ctx.lineTo(arm,-0.02*k);ctx.stroke();
+  // body
+  ctx.fillStyle='#d6dbe5';const bw=0.22*k,bh=0.07*k;
+  ctx.beginPath();ctx.roundRect?ctx.roundRect(-bw/2,-bh/2-0.03*k,bw,bh,4):ctx.rect(-bw/2,-bh/2-0.03*k,bw,bh);ctx.fill();
+  ctx.fillStyle='#4cc2ff';ctx.fillRect(-0.025*k,-0.045*k,0.05*k,0.02*k);
+  // rotors
+  [[-arm,S.F1,'#f472b6'],[arm,S.F2,'#a3e635']].forEach(([px,F,col],i)=>{
+    ctx.fillStyle='#5b6478';ctx.fillRect(px-0.025*k,-0.07*k,0.05*k,0.05*k);
+    const pw=0.2*k*Math.abs(Math.cos(S.prop*(i?1:-1)));
+    ctx.fillStyle='rgba(200,210,230,0.25)';ctx.beginPath();ctx.ellipse(px,-0.075*k,0.2*k,0.018*k,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(230,235,245,0.8)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(px-pw,-0.075*k);ctx.lineTo(px+pw,-0.075*k);ctx.stroke();
+    // thrust arrow
+    const len=F/Fmax*0.7*k;
+    if(len>1){ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(px,-0.1*k);ctx.lineTo(px,-0.1*k-len);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(px,-0.1*k-len-7);ctx.lineTo(px-5,-0.1*k-len+1);ctx.lineTo(px+5,-0.1*k-len+1);ctx.closePath();ctx.fill();}
+  });
+  ctx.restore();
+  // drone off-screen indicator
+  if(S.y>YMAX){ctx.fillStyle='#f87171';ctx.beginPath();ctx.moveTo(wx(S.x),4);ctx.lineTo(wx(S.x)-7,16);ctx.lineTo(wx(S.x)+7,16);ctx.closePath();ctx.fill();}
+}
+
+// ---------- Plot ----------
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<1.5?1:f<3.5?2:f<7.5?5:10)*p;}
+function drawPlot(c,series,minSpan){
+  const [w,h]=fit(c);const x=c.getContext('2d');x.clearRect(0,0,w,h);
+  const pl=40,pr=6,pt=6,pb=18,iw=w-pl-pr,ih=h-pt-pb;
+  let lo=Infinity,hi=-Infinity;
+  for(const s of buf)for(const sr of series){const v=s[sr.k];if(v<lo)lo=v;if(v>hi)hi=v;}
+  if(!isFinite(lo)){lo=0;hi=1;}
+  const mid=(lo+hi)/2;let span=Math.max(hi-lo,minSpan)*1.15;lo=mid-span/2;hi=mid+span/2;
+  const t1=Math.max(S.t,WIN),t0=t1-WIN;
+  const X=t=>pl+(t-t0)/WIN*iw, Y=v=>pt+(hi-v)/(hi-lo)*ih;
+  x.font='10px IBM Plex Mono, monospace';x.lineWidth=1;
+  const st=niceStep(span/4);
+  for(let v=Math.ceil(lo/st)*st;v<=hi;v+=st){const yy=Math.round(Y(v))+.5;x.strokeStyle=Math.abs(v)<1e-9?'rgba(138,147,166,0.35)':'rgba(138,147,166,0.12)';x.beginPath();x.moveTo(pl,yy);x.lineTo(w-pr,yy);x.stroke();x.fillStyle='#8a93a6';x.textAlign='right';x.fillText((+v.toFixed(3)).toString(),pl-4,yy+3);}
+  x.textAlign='center';
+  for(let t=Math.ceil(t0/2)*2;t<=t1;t+=2){const xx=Math.round(X(t))+.5;x.strokeStyle='rgba(138,147,166,0.12)';x.beginPath();x.moveTo(xx,pt);x.lineTo(xx,pt+ih);x.stroke();x.fillStyle='#8a93a6';x.fillText(t+'s',xx,h-4);}
+  x.save();x.beginPath();x.rect(pl,pt,iw,ih);x.clip();
+  for(const sr of series){
+    x.strokeStyle=sr.c;x.lineWidth=sr.w||1.8;x.setLineDash(sr.dash?[5,4]:[]);x.beginPath();
+    buf.forEach((s,i)=>{const px=X(s.t),py=Y(s[sr.k]);i?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();
+  }
+  x.restore();x.setLineDash([]);
+}
+const pY=document.getElementById('pY'),pX=document.getElementById('pX'),pT=document.getElementById('pT'),pF=document.getElementById('pF');
+function drawPlots(){
+  drawPlot(pY,[{k:'ysp',c:'#ffb547',dash:1},{k:'y',c:'#4cc2ff'}],1);
+  drawPlot(pX,[{k:'xsp',c:'#ffb547',dash:1},{k:'x',c:'#4cc2ff'}],1);
+  drawPlot(pT,[{k:'thd',c:'#ffb547',dash:1},{k:'th',c:'#4cc2ff'}],10);
+  drawPlot(pF,[{k:'hov',c:'#8a93a6',dash:1,w:1},{k:'F1',c:'#f472b6'},{k:'F2',c:'#a3e635'}],4);
+}
+
+// ---------- UI: loop PID ----------
+const loopsEl=document.getElementById('loops');
+const ui={};
+for(const key of ['z','x','th']){
+  const d=LOOPDEF[key],p=pid[key];
+  const el=document.createElement('div');el.className='loop';
+  el.innerHTML=`<div class="lh"><label><input type="checkbox" checked> ${d.name}</label></div><div class="mut" style="margin:-4px 0 4px">${d.unit}</div>`+
+    ['kp','ki','kd'].map(g=>`<div class="row"><label>${g==='kp'?'K<sub>p</sub>':g==='ki'?'K<sub>i</sub>':'K<sub>d</sub>'}</label><input type="range" data-g="${g}" min="${d.r[g][0]}" max="${d.r[g][1]}" step="${d.r[g][2]}" value="${p[g]}"><input type="number" data-g="${g}" min="${d.r[g][0]}" step="${d.r[g][2]}" value="${p[g]}"></div>`).join('')+
+    `<div class="bars">${['P','I','D','u'].map(n=>`<div class="bar"><span>${n}: <b data-v="${n}">0</b></span><div class="tr"><div class="fl" data-b="${n}" style="background:${n==='P'?'var(--p)':n==='I'?'var(--i)':n==='D'?'var(--d)':'var(--txt)'}"></div></div></div>`).join('')}</div>`;
+  loopsEl.appendChild(el);
+  el.querySelector('input[type=checkbox]').addEventListener('change',e=>{p.on=e.target.checked;p.reset();el.style.opacity=p.on?1:.55;});
+  el.querySelectorAll('input[data-g]').forEach(inp=>inp.addEventListener('input',e=>{
+    const gname=e.target.dataset.g;let v=parseFloat(e.target.value);if(isNaN(v))return;v=Math.max(0,v);p[gname]=v;
+    el.querySelectorAll(`input[data-g=${gname}]`).forEach(o=>{if(o!==e.target)o.value=v;});
+  }));
+  ui[key]={el,vals:{},bars:{}};
+  ['P','I','D','u'].forEach(n=>{ui[key].vals[n]=el.querySelector(`[data-v=${n}]`);ui[key].bars[n]=el.querySelector(`[data-b=${n}]`);});
+}
+function syncGains(){for(const key in ui){const p=pid[key];ui[key].el.querySelectorAll('input[data-g]').forEach(i=>i.value=p[i.dataset.g]);}}
+function updateBars(){
+  for(const key in ui){const p=pid[key],lim=Math.max(Math.abs(p.min),p.max);
+    const v={P:p.p,I:p.I,D:p.d,u:clamp(p.u,p.min,p.max)};
+    for(const n in v){const r=clamp(v[n]/lim,-1,1);ui[key].vals[n].textContent=v[n].toFixed(Math.abs(v[n])>=100?0:2);
+      const b=ui[key].bars[n];b.style.left=(r>=0?50:50+r*50)+'%';b.style.width=Math.abs(r)*50+'%';}
+  }
+}
+const presetsEl=document.getElementById('presets');
+for(const name in PRESETS){const b=document.createElement('button');b.textContent=name;b.onclick=()=>{
+  const pr=PRESETS[name];for(const k of ['z','x']){[pid[k].kp,pid[k].ki,pid[k].kd]=pr[k];pid[k].I=0;}
+  syncGains();presetsEl.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));toast('Preset: '+name);
+};presetsEl.appendChild(b);if(name==='Seimbang')b.classList.add('on');}
+
+// ---------- UI: slider umum ----------
+function makeSliders(container,defs){
+  const el=document.getElementById(container);
+  defs.forEach(d=>{
+    const row=document.createElement('div');row.className='row';row.style.gridTemplateColumns='118px 1fr';
+    row.innerHTML=`<label>${d.label}<br><b></b></label><input type="range" min="${d.min}" max="${d.max}" step="${d.step}" value="${opt[d.k]*(d.mul||1)}">`;
+    el.appendChild(row);const out=row.querySelector('b'),inp=row.querySelector('input');
+    const upd=()=>{const v=parseFloat(inp.value);opt[d.k]=v/(d.mul||1);out.textContent=d.fmt(v);};
+    inp.addEventListener('input',upd);upd();d.input=inp;d.upd=upd;
+  });
+  return defs;
+}
+const distDefs=makeSliders('distSliders',[
+  {k:'mass',label:'Massa drone',min:0.5,max:2,step:0.05,fmt:v=>v.toFixed(2)+' kg'},
+  {k:'wind',label:'Angin konstan',min:-6,max:6,step:0.1,fmt:v=>(v>0?'+':'')+v.toFixed(1)+' N'},
+  {k:'turb',label:'Turbulensi',min:0,max:3,step:0.05,fmt:v=>v.toFixed(2)+' N'},
+  {k:'noisePos',label:'Noise sensor posisi',min:0,max:0.1,step:0.002,fmt:v=>'σ '+(v*100).toFixed(1)+' cm'},
+  {k:'noiseAng',label:'Noise sensor sudut',min:0,max:3,step:0.05,fmt:v=>'σ '+v.toFixed(2)+'°'}
+]);
+makeSliders('sysSliders',[
+  {k:'fc',label:'Frekuensi kendali',min:10,max:1000,step:5,fmt:v=>v+' Hz (Ts '+(1000/v).toFixed(1)+' ms)'},
+  {k:'dCut',label:'Filter turunan',min:1,max:200,step:1,fmt:v=>v>=200?'tanpa filter':v+' Hz'},
+  {k:'maxTilt',label:'Sudut kemiringan maks',min:5,max:45,step:1,fmt:v=>v+'°'},
+  {k:'tau',label:'Konstanta waktu motor',min:5,max:150,step:1,mul:1000,fmt:v=>v+' ms'}
+]);
+document.getElementById('optFF').onchange=e=>opt.ff=e.target.checked;
+document.getElementById('optDM').onchange=e=>opt.dOnMeas=e.target.checked;
+document.getElementById('optAW').onchange=e=>opt.antiWindup=e.target.checked;
+
+document.getElementById('gustL').onclick=()=>{S.gust=-6;S.gustT=0.6;};
+document.getElementById('gustR').onclick=()=>{S.gust=6;S.gustT=0.6;};
+document.getElementById('kick').onclick=()=>{S.om+=(Math.random()<.5?-1:1)*8;};
+document.getElementById('clearDist').onclick=()=>{distDefs.forEach(d=>{if(d.k!=='mass'){d.input.value=0;d.upd();}});S.gust=0;S.turb=0;};
+
+// tabs
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.t));
+});
+// toolbar
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll('#speedSeg button').forEach(b=>b.onclick=()=>{speed=+b.dataset.s;document.querySelectorAll('#speedSeg button').forEach(x=>x.classList.toggle('on',x===b));});
+const pauseBtn=document.getElementById('pauseBtn');
+function togglePause(){paused=!paused;pauseBtn.textContent=paused?'Lanjut':'Jeda';pauseBtn.classList.toggle('on',paused);}
+pauseBtn.onclick=togglePause;
+document.getElementById('resetBtn').onclick=()=>{resetAll();toast('Simulasi direset');};
+document.getElementById('stepZ').onclick=()=>{setMode('manual');setSP(sp.x,Math.abs(sp.y-2)<0.1?5:2);};
+document.getElementById('stepX').onclick=()=>{setMode('manual');setSP(Math.abs(sp.x+3)<0.1?3:-3,sp.y);};
+
+// pointer
+let dragging=false;
+function ptr(e){const r=cv.getBoundingClientRect();const px=e.clientX-r.left,py=e.clientY-r.top;setSP(XMIN+px/scale,YMIN+(H-py)/scale);}
+cv.addEventListener('pointerdown',e=>{if(mode!=='manual')setMode('manual');dragging=true;cv.setPointerCapture(e.pointerId);ptr(e);});
+cv.addEventListener('pointermove',e=>{if(dragging)ptr(e);});
+cv.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  const d={ArrowLeft:[-.5,0],ArrowRight:[.5,0],ArrowUp:[0,.5],ArrowDown:[0,-.5]}[e.key];
+  if(d){e.preventDefault();if(mode!=='manual')setMode('manual');setSP(sp.x+d[0],sp.y+d[1]);}
+  else if(e.key===' '){e.preventDefault();togglePause();}
+  else if(e.key==='r'||e.key==='R'){resetAll();}
+});
+
+// CSV
+document.getElementById('copyCsv').onclick=async()=>{
+  const rows=['t,y,y_sp,x,x_sp,theta_deg,theta_ref_deg,F1,F2'].concat(buf.map(s=>[s.t,s.y,s.ysp,s.x,s.xsp,s.th,s.thd,s.F1,s.F2].map(v=>v.toFixed(4)).join(',')));
+  try{await navigator.clipboard.writeText(rows.join('\n'));toast('Data CSV ('+buf.length+' baris) disalin');}catch(err){toast('Gagal menyalin ke clipboard');}
+};
+let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity=0,1600);}
+
+// ---------- HUD & metrik ----------
+const hud=document.getElementById('hud'),statusEl=document.getElementById('status');
+const fmtS=v=>v==null?'—':v.toFixed(2)+' s';
+function updateText(){
+  hud.innerHTML=`t <b>${S.t.toFixed(1)} s</b><br>y <b>${S.y.toFixed(2)} m</b> · x <b>${S.x.toFixed(2)} m</b><br>θ <b>${(S.th/DEG).toFixed(1)}°</b> · θref <b>${(S.thd/DEG).toFixed(1)}°</b><br>F₁ <b>${S.F1.toFixed(2)}</b> · F₂ <b>${S.F2.toFixed(2)} N</b><br>angin <b>${S.fw.toFixed(2)} N</b>`;
+  let st,col;
+  if(paused){st='DIJEDA';col='var(--sp)';}
+  else if(Math.abs(S.th)>70*DEG){st='TERBALIK — tekan Reset';col='var(--bad)';}
+  else if(S.sat){st='Motor saturasi';col='var(--sp)';}
+  else if(S.ground){st='Di tanah';col='var(--mut)';}
+  else {st='Terbang';col='var(--ok)';}
+  statusEl.textContent=st;statusEl.style.color=col;
+  for(const [k,id] of [['z','mz'],['x','mx']]){
+    const m=meter[k];
+    document.getElementById(id+'R').textContent=fmtS(m.rise);
+    const o=m.overshoot;document.getElementById(id+'O').textContent=o==null?'—':o.toFixed(1)+' %';
+    document.getElementById(id+'S').textContent=fmtS(m.settle(S.t));
+    document.getElementById(id+'E').textContent=(m.essF>=0?'+':'')+(m.essF*100).toFixed(1)+' cm';
+  }
+}
+
+// ---------- Loop utama ----------
+resetAll();
+let last=performance.now(),uiAcc=0;
+function frame(now){
+  const real=Math.min((now-last)/1000,0.05);last=now;
+  if(!paused){S.acc+=real*speed;const h=0.001;let n=0;while(S.acc>=h&&n<400){step(h);S.acc-=h;n++;}if(n>=400)S.acc=0;}
+  drawSim(paused?0:real);drawPlots();
+  uiAcc+=real;if(uiAcc>1/15){uiAcc=0;updateText();updateBars();}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
